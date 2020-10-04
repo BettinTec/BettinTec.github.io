@@ -83,6 +83,9 @@ input, select, textarea {
   -ms-appearance: none;
   appearance: none; }
 
+
+  .img-fluid{max-width:50%;height:auto}
+
 /* Typography */
 html {
   font-size: 13pt; }
