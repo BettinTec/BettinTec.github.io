@@ -7,6 +7,8 @@
 		<meta name="keywords" content="" />
 		<link rel="stylesheet" href="assets/css/main.css" />
 		<link rel="stylesheet" href="assets/css/wpp-float.css" />
+		<link rel="stylesheet" href="assets/css/dropdown.css" />
+		<link rel="stylesheet" href="assets/css/modal.css" />
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
 	</head>
 	<body class="is-preload">
@@ -110,11 +112,30 @@
 				<div class="inner">
 					<h2>Vamos ser parceiros de sucesso?</h2>
 					<p>Estamos prontos para te atender da melhor forma possível e te ajudar com a experiência de quem está há 8 anos atuando no mercado. </br> Estamos disponíveis para conversar através dos canais abaixo, é só clicar. <br> <br>
-						<a href="tel:30335003"><button type="button" class="button primary"><i class="fa fa-whatsapp  fa-lg" aria-hidden="true"></i> (43) 9 9938-9310<br> <p style="color:#ffff">WhatsApp</p></button> </a>
-						<a href="tel:30335003"><button type="button" class="button primary"><i class="fa fa-phone fa-lg" aria-hidden="true"></i> (43) 3033-5003<br> <p style="color:#ffff">Ligar</p> </button> </a> &nbsp;
-						<a href="http://m.me/614592158930525"><button type="button" class="button primary"><i class="fa fa-facebook fa-lg" aria-hidden="true"></i> Facebook<br> <p style="color:#ffff">Messenger</p> </button> </a>&nbsp;
-						<a href="mailto:contato@agapecontabilidade.com.br"><button type="button" class="button primary"><i class="fa fa-envelope-o fa-lg" aria-hidden="true"></i> contato@agapecontabilidade.com.br<br> <p style="color:#ffff">Enviar E-mail</p> </button> </a>					
+						
+						<div class="dropdown">
+								<button class="dropbtn">Vamos conversar</button>
+								<div class="dropdown-content">
+								  <a href="https://api.whatsapp.com/send?phone=5543999389310&text=Ol%C3%A1%2C%20estava%20%20no%20site%20de%20voc%C3%AAs%2C%20como%20podem%20me%20ajudar%3F%20">No WhatsApp (43) 9 9938-9310</a>
+								  <a href="tel:(43) 3033-5003">No Telefone (43) 3033-5003</a>
+								  <a href="mailto:contato@agapecontabilidade.com.br?subject=Contato via Site&body=Nos informe seu nome e se preferir seu telefone e nos do que você precisa.">No E-mail contato@agapecontabilidade.com.br</a>
+								  <a href="https://m.me/614592158930525">No Facebook @agapecontabilidade</a>
+								</div>
+							</div>
+							
+						  </div>				
 					</p>
+					<br>
+					
+					<a href="#abrirModal">Open Modal</a>
+
+<div id="abrirModal" class="modal">
+  <a href="#fechar" title="Fechar" class="fechar">x</a>
+  <h2>Janela Modal</h2>
+  <p>Esta é uma simples janela de modal.</p>
+  <p>Você pode fazer qualquer coisa aqui, página de Login, pop-ups, ou formulários</p>
+</div>
+
 				</div>
 			</section>
 
@@ -197,7 +218,7 @@
 						</section>
 					</div>
 					<div class="copyright">
-						&copy; Untitled. Photos <a href="https://unsplash.co">Unsplash</a>, Video <a href="https://coverr.co">Coverr</a>.
+						&copy; 	<script type="text/javascript">document.write(new Date().getFullYear());</script> - Desenvolvido pela <a href="https://www.bettintec.com.br">Bettin Tecnologia</a>
 					</div>
 				</div>
 			</footer>
