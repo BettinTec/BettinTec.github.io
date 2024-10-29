@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de CNPJ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Adiciona o jsPDF primeiro -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.23/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.17.0/dist/xlsx.full.min.js"></script>
+    <style>
+        .highlight {
+            background-color: #f0f0f0; /* Cor de fundo para destaque */
+            font-weight: bold; /* Destacar o texto */
+        }
+        .separator {
+            height: 10px; /* Altura da linha separadora */
+            background-color: #e9ecef; /* Cor da linha separadora */
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Consulta de CNPJ</h1>
+        <!-- Formulário para consulta individual -->
+        <div class="mb-3">
+            <label for="cnpjInput" class="form-label">Digite o CNPJ:</label>
+            <input type="text" id="cnpjInput" class="form-control" placeholder="00.000.000/0000-00">
+            <button id="consultarCNPJ" class="btn btn-primary mt-2">Consultar</button>
+        </div>
+
+        <!-- Botão para upload de arquivo Excel -->
+        <div class="mb-3">
+            <label for="arquivoCNPJ" class="form-label">Importar lista de CNPJs (Excel):</label>
+            <input type="file" id="arquivoCNPJ" class="form-control">
+            <button id="processarArquivo" class="btn btn-success mt-2">Processar Arquivo</button>
+        </div>
+
+        <!-- Barra de progresso -->
+        <div class="progress mt-3" style="display: none;">
+            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+
+        <!-- Botões de exportação -->
+        <button id="exportarPDF" class="btn btn-danger mt-2">Exportar PDF</button>
+        <button id="exportarExcel" class="btn btn-success mt-2">Exportar Excel</button>
+
+        <!-- Tabela de resultados da consulta individual -->
+        <table id="resultados" class="table mt-5" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Campo</th>
+                    <th>Valor</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        // Função para consultar um CNPJ via API
+        async function consultarCNPJ(cnpj) {
+            const cleanedCNPJ = cnpj.replace(/[^\d]+/g, ''); // Remove pontuação
+            const response = await fetch(`https://www.receitaws.com.br/v1/cnpj/${cleanedCNPJ}`);
+            const data = await response.json();
+            return data;
+        }
+
+        // Exibir resultados da consulta individual
+        function displayCNPJResults(data, tableId) {
+            const tbody = document.querySelector(`${tableId} tbody`);
+            tbody.innerHTML = ''; // Limpa resultados anteriores
+
+            const keys = [
+                'abertura', 'situacao', 'tipo', 'nome', 'fantasia', 'porte', 'natureza_juridica',
+                'atividade_principal', 'atividades_secundarias', 'qsa', 'logradouro', 'numero',
+                'bairro', 'municipio', 'uf', 'cep', 'email', 'telefone', 'capital_social',
+                'data_situacao', 'cnpj', 'ultima_atualizacao'
+            ];
+
+            document.querySelector(tableId).style.display = 'table';
+
+            keys.forEach(key => {
+                const row = document.createElement('tr');
+                const titleCell = document.createElement('td');
+                const valueCell = document.createElement('td');
+                
+                titleCell.textContent = formatTitle(key);
+                valueCell.textContent = formatValue(data[key]);
+
+                row.appendChild(titleCell);
+                row.appendChild(valueCell);
+                tbody.appendChild(row);
+            });
+        }
+
+        // Formatar o título dos campos
+        function formatTitle(key) {
+            return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        // Formatar o valor para visualização
+        function formatValue(value) {
+            if (Array.isArray(value)) {
+                return value.map(item => item.text || item.nome || item.code).join(', ');
+            }
+            return value ? value.toString() : 'N/A';
+        }
+
+        // Função para pausar a execução
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Função para processar arquivo Excel e consultar CNPJs com limite de 3 por minuto
+        document.getElementById('processarArquivo').addEventListener('click', async function () {
+            const fileInput = document.getElementById('arquivoCNPJ');
+            if (!fileInput.files.length) {
+                alert('Por favor, selecione um arquivo.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const cnpjs = XLSX.utils.sheet_to_json(sheet, { header: 1 }).flat();
+
+                // Limpar pontuação dos CNPJs
+                const cnpjsLimpos = cnpjs.map(cnpj => cnpj.replace(/[^\d]+/g, ''));
+
+                if (cnpjsLimpos.length === 0) {
+                    alert('Nenhum CNPJ válido encontrado.');
+                    return;
+                }
+
+                // Barra de progresso
+                const progressBar = document.getElementById('progressBar');
+                const progressDiv = document.querySelector('.progress');
+                progressDiv.style.display = 'block';
+
+                // Limpa a tabela de resultados antes de iniciar
+                document.querySelector('#resultados tbody').innerHTML = '';
+
+                // Processar os CNPJs respeitando o limite de 3 por minuto
+                for (let i = 0; i < cnpjsLimpos.length; i++) {
+                    if (i > 0 && i % 3 === 0) {
+                        // Pausa de 60 segundos após cada 3 consultas
+                        console.log("Aguardando 60 segundos para continuar as consultas...");
+                        await sleep(60000);  // 60 segundos
+                    }
+
+                    const cnpj = cnpjsLimpos[i];
+                    try {
+                        const result = await consultarCNPJ(cnpj);
+                        console.log('Resultado para CNPJ:', cnpj, result);  
+
+                        // Chame a função para exibir os resultados formatados
+                        displayBatchCNPJResults(result, cnpj);
+                    } catch (error) {
+                        console.error(`Erro ao consultar o CNPJ ${cnpj}:`, error);
+                    }
+
+                    const progress = ((i + 1) / cnpjsLimpos.length) * 100;
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.setAttribute('aria-valuenow', progress);
+                    progressBar.textContent = `${Math.round(progress)}%`;
+                }
+
+                alert('Consultas finalizadas!');
+            };
+            reader.onerror = function () {
+                alert('Erro ao ler o arquivo.');
+            };
+
+            reader.readAsArrayBuffer(fileInput.files[0]);
+        });
+
+        // Função para exibir os resultados da consulta em lote
+        function displayBatchCNPJResults(data, cnpj) {
+            const tbody = document.querySelector('#resultados tbody');
+            tbody.innerHTML += `<tr class="highlight"><td>CNPJ:</td><td>${cnpj}</td></tr>`; // Destaca o CNPJ
+            const keys = [
+                'abertura', 'situacao', 'tipo', 'nome', 'fantasia', 'porte', 'natureza_juridica',
+                'atividade_principal', 'atividades_secundarias', 'qsa', 'logradouro', 'numero',
+                'bairro', 'municipio', 'uf', 'cep', 'email', 'telefone', 'capital_social',
+                'data_situacao', 'ultima_atualizacao'
+            ];
+
+            keys.forEach(key => {
+                const row = document.createElement('tr');
+                const titleCell = document.createElement('td');
+                const valueCell = document.createElement('td');
+                
+                titleCell.textContent = formatTitle(key);
+                valueCell.textContent = formatValue(data[key]);
+
+                row.appendChild(titleCell);
+                row.appendChild(valueCell);
+                tbody.appendChild(row);
+            });
+
+            // Linha separadora
+            const separatorRow = document.createElement('tr');
+            const separatorCell = document.createElement('td');
+            separatorCell.colSpan = 2; // Ocupa as duas colunas
+            separatorRow.classList.add('separator');
+            separatorRow.appendChild(separatorCell);
+            tbody.appendChild(separatorRow);
+        }
+
+        // Exportar para PDF
+        document.getElementById('exportarPDF').addEventListener('click', function () {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Adiciona título
+            doc.text('Resultados da Consulta de CNPJ', 14, 10);
+            doc.autoTable({ html: '#resultados' });
+            doc.save('resultados_consulta_cnpj.pdf');
+        });
+
+// Função para exportar os resultados para Excel no formato solicitado
+document.getElementById('exportarExcel').addEventListener('click', function () {
+    const tableData = [];
+    
+    // Adiciona o cabeçalho personalizado
+    tableData.push([
+        'CNPJ',
+        'EMPRESA',
+        'DOMICILIO',
+        'REGIME TRIBUTÁRIO',
+        'SITUAÇÃO',
+        'DATA DE ABERTURA',
+        'ATIVIDADE PRINCIPAL',
+        'QSA'
+    ]);
+
+    // Seleciona as linhas de dados da tabela de resultados
+    const rows = document.querySelectorAll('#resultados tbody tr');
+    let currentRow = new Array(8).fill(''); // Inicializa uma linha com 8 campos vazios
+
+    rows.forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+
+        // Quando um novo CNPJ é encontrado, salva a linha atual no array final, se tiver algum dado
+        if (cells[0].textContent.trim() === "CNPJ:") {
+            if (currentRow.some(value => value)) { // Verifica se há algum valor preenchido
+                tableData.push(currentRow); // Adiciona ao array final
+            }
+            currentRow = new Array(8).fill(''); // Reseta para nova linha
+            currentRow[0] = cells[1].textContent; // CNPJ como primeiro item
+        } else {
+            // Adiciona os valores restantes da consulta do CNPJ atual
+            switch (cells[0].textContent.trim().toLowerCase()) {
+                case 'nome':
+                    currentRow[1] = cells[1].textContent; // Empresa
+                    break;
+                case 'municipio':
+                    currentRow[2] = `${currentRow[2] || ''} ${cells[1].textContent}`.trim(); // Domicílio
+                    break;
+                case 'porte':
+                    currentRow[3] = cells[1].textContent; // Regime Tributário (Porte)
+                    break;
+                case 'situacao':
+                    currentRow[4] = cells[1].textContent; // Situação
+                    break;
+                case 'abertura':
+                    currentRow[5] = cells[1].textContent; // Data de Abertura
+                    break;
+                case 'atividade principal':
+                    currentRow[6] = cells[1].textContent; // Atividade Principal
+                    break;
+                case 'qsa':
+                    currentRow[7] = cells[1].textContent; // QSA
+                    break;
+            }
+        }
+
+        // Adiciona a última linha se for o final da tabela
+        if (index === rows.length - 1 && currentRow.some(value => value)) {
+            tableData.push(currentRow);
+        }
+    });
+
+    // Cria uma nova planilha com os dados organizados
+    const worksheet = XLSX.utils.aoa_to_sheet(tableData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resultados');
+    
+    // Salva o arquivo
+    XLSX.writeFile(workbook, 'resultados_consulta_cnpj.xlsx');
+});
+
+
+
+        // Consultar CNPJ individual
+        document.getElementById('consultarCNPJ').addEventListener('click', async function () {
+            const cnpj = document.getElementById('cnpjInput').value;
+            if (!cnpj) {
+                alert('Por favor, digite um CNPJ.');
+                return;
+            }
+
+            try {
+                const result = await consultarCNPJ(cnpj);
+                displayCNPJResults(result, '#resultados');
+            } catch (error) {
+                console.error(`Erro ao consultar o CNPJ ${cnpj}:`, error);
+            }
+        });
+    </script>
+</body>
+</html>
